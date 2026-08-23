@@ -1,12 +1,20 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from pathlib import Path
 from typing import Dict
 import joblib, json
 
+
 app = FastAPI()
 
-model = joblib.load("../models/fraud_model.joblib")
-feature_types = json.load("../models/fraud_model_feature_types.json")
+BUNDLE_PATH = Path(__file__).resolve().parents[1] / "models" / "fraud_model.joblib"
+bundle = joblib.load(BUNDLE_PATH)
+
+model             = bundle["model"]
+feature_order     = bundle["feature_order"]
+category_levels   = bundle["category_levels"]
+pr_curve          = bundle["pr_curve"]
+default_threshold = bundle["default_threshold"]
 
 class PredictionData(BaseModel):
     TransactionAmt: float

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+from typing import Dict, Optional, Union
 from pathlib import Path
-from typing import Dict
 import joblib, json
 
 
@@ -16,12 +16,30 @@ category_levels   = bundle["category_levels"]
 pr_curve          = bundle["pr_curve"]
 default_threshold = bundle["default_threshold"]
 
-class PredictionData(BaseModel):
-    TransactionAmt: float
-    TransactionDT: float
-    ProductCD: str
-    
-    features: Dict[str, str | float]
+class Transaction(BaseModel):
+    TransactionAmt: float = Field(..., gt=0, description="Transaction amount")
+    ProductCD: str = Field(..., min_length=1, max_length=4)
+    features: Dict[str, Union[float, str, None]] = Field(default_factory=dict)
+
+    @field_validator("TransactionAmt")
+    @classmethod
+    def finite_amount(cls, v):
+        if v != v or v in (float("inf"), float("-inf")):
+            raise ValueError("TransactionAmt must be finite")
+        return v
+
+    @field_validator("features")
+    @classmethod
+    def known_features(cls, v):
+        unknown = set(v) - set(feature_order)
+        if unknown:
+            raise ValueError(f"unknown features: {sorted(unknown)[:5]}")
+        return v
+
+
+class PredictionRequest(BaseModel):
+    transaction: Transaction
+    threshold: Optional[float] = Field(None, ge=0.0, le=1.0)
 
 
 @app.post("/predict")

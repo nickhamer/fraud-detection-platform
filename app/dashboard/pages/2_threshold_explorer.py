@@ -18,15 +18,13 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-.block-container { padding-top: 1.8rem; padding-bottom: 1rem; }
+.block-container { padding-top: 1.8rem; padding-bottom: 1rem; max-width: 1100px;}
 [data-testid="stMetricValue"] { font-size: 1.4rem; }
 h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
 </style>
 """, unsafe_allow_html=True)
 st.markdown("""
     <style>
-    .block-container { padding-top: 1.8rem; padding-bottom: 1rem; }
-    h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
 
     [data-testid="stVerticalBlock"] { gap: 0.4rem; }
     [data-testid="stHorizontalBlock"] { gap: 0.5rem; }
@@ -79,12 +77,9 @@ rec = np.array(c["recall"])
 prevalence = info["fraud_prevalence_baseline"]
 
 
-c1, c2, c3 = st.columns(3)
+c1, c2 = st.columns([1, 3])
 volume  = c1.number_input("Transactions per day", 1_000, 10_000_000, 100_000, step=1_000)
-cost_fn = c2.number_input("Cost of a missed fraud ($)", 1, 100_000, 200, step=10)
-cost_fp = c3.number_input("Cost of a false alarm ($)", 0, 10_000, 5, step=1)
-
-t = st.slider("Alert threshold", float(thr.min()), float(thr.max()),
+t = c2.slider("Alert threshold", float(thr.min()), float(thr.max()),
               float(info["default_threshold"]), step=0.01)
 
 
@@ -97,11 +92,6 @@ missed = n_fraud - caught
 flagged = caught / p if p > 0 else 0
 false_alarms = flagged - caught
 
-m = st.columns(4)
-m[0].metric("Precision", f"{p:.1%}")
-m[1].metric("Recall", f"{r:.1%}")
-m[2].metric("Flagged / day", f"{flagged:,.0f}")
-m[3].metric("False alarms / day", f"{false_alarms:,.0f}")
 
 st.caption(
     f"At this threshold, roughly **{caught:,.0f}** of the ~{n_fraud:,.0f} daily frauds are "
@@ -110,6 +100,12 @@ st.caption(
     f"{false_alarms / max(caught, 1):.1f} false alarms per fraud found."
 )
 
+def _thousands(x, pos):
+    if abs(x) >= 1e6:
+        return f"${x/1e6:.1f}M"
+    if abs(x) >= 1e3:
+        return f"${x/1e3:.0f}K"
+    return f"${x:.0f}"
 
 
 n_fraud_all = volume * prevalence
@@ -118,21 +114,32 @@ missed_all = n_fraud_all - caught_all
 flagged_all = np.divide(caught_all, prec, out=np.zeros_like(prec), where=prec > 0)
 fp_all = np.maximum(flagged_all - caught_all, 0)
 
+
+metrics_area_above = st.container()
+
+left, right = st.columns([1, 3])
+with left:
+    st.metric("Precision", f"{p:.1%}")
+    st.metric("Recall", f"{r:.1%}")
+    st.metric("Flagged / day", f"{flagged:,.0f}")
+    st.metric("False alarms / day", f"{false_alarms:,.0f}")
+    
+    cost_fn = st.number_input("Cost of a missed fraud ($)", 1, 100_000, 200, step=10)
+    cost_fp = st.number_input("Cost of a false alarm ($)", 0, 10_000, 5, step=1)
+with right:
+    plot_area = st.container()
+
+
+
 total_cost = missed_all * cost_fn + fp_all * cost_fp
 
 best = int(np.argmin(total_cost))
 cost_here = total_cost[i]
 p_best, r_best = prec[best], rec[best]
 
-k1, k2, k3, k4 = st.columns(4)
-k1.metric("Cost at your threshold", f"${cost_here:,.0f}/day")
-k2.metric("Optimal threshold", f"{thr[best]:.3f}")
-k3.metric("Cost at optimum", f"${total_cost[best]:,.0f}/day")
-k4.metric("","",delta=f"-${cost_here - total_cost[best]:,.0f} at optimum",
-          delta_color="inverse")
 
 fig, (ax, ax2) = plt.subplots(
-    2, 1, figsize=(7, 5), sharex=True,
+    2, 1, figsize=(8, 5), sharex=True,
     height_ratios=[3, 1.3], gridspec_kw={"hspace": 0}
 )
 
@@ -155,12 +162,6 @@ ax.set_ylim(0, 1)
 ax.xaxis.set_tick_params(bottom=True, direction="in", labelbottom=False)
 ax.grid(alpha=0.4)
 
-def _thousands(x, pos):
-    if abs(x) >= 1e6:
-        return f"${x/1e6:.1f}M"
-    if abs(x) >= 1e3:
-        return f"${x/1e3:.0f}K"
-    return f"${x:.0f}"
 
 # --- bottom: cost ---
 ax2.scatter(rec, total_cost, c=thr, cmap="viridis", s=8, norm=sc.norm)
@@ -180,7 +181,16 @@ h1, l1 = ax.get_legend_handles_labels()
 h2, l2 = ax2.get_legend_handles_labels()
 ax.legend(h1 + h2, l1 + l2, loc="upper right", fontsize=8)
 
-st.pyplot(fig)
+with metrics_area_above:
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Cost at your threshold", f"${cost_here:,.0f}/day")
+    k2.metric("Optimal threshold", f"{thr[best]:.3f}")
+    k3.metric("Cost at optimum", f"${total_cost[best]:,.0f}/day")
+    k4.metric("","",delta=f"-${cost_here - total_cost[best]:,.0f} at optimum",
+              delta_color="inverse")
+
+with plot_area:
+    st.pyplot(fig, width="content")
 
 
 st.divider()

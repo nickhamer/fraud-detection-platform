@@ -3,7 +3,7 @@
 Scoring card transactions for fraud risk, with a deployed API and an interactive dashboard
 for exploring the alert-threshold trade-off.
 
-**[Live dashboard](https://fraud-dashboard-wncx.onrender.com/)** · **[API docs](https://fraud-api-wbxh.onrender.com/)**
+**[Live dashboard](https://fraud-dashboard-wncx.onrender.com/)** · **[API docs](https://fraud-api-wbxh.onrender.com/docs)**
 
 > Both services run on Render's free tier and sleep after inactivity — the first request
 > may take 30–60 seconds to wake.
